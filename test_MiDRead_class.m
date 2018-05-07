@@ -1,11 +1,11 @@
 clear all
 close all
 clc
-
+warning on
 %Script to test the matchId reader class. - A. Lavatelli - 2018
 
 %% Read csv dir
-dirlist=dir('test_data_g1\*.csv');
+dirlist=dir('test_data_g2\*.csv');
 Nf=size(dirlist,1);
 
 for i=1:Nf
@@ -15,6 +15,7 @@ end
 %%  Create class instance and read a single file
 %create class instance with a single file name and its handle
 MiDReadHandle=MatchIDdataReader(DicFiles{1});
+MiDReadHandle.SetNaNString('Non un numero reale');
 %read data
 DicDataSingle=MiDReadHandle.ReadData();
 %plot

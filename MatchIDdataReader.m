@@ -68,9 +68,27 @@ classdef MatchIDdataReader < handle
          function  DicMultOutput=ReadMultipleData(obj)
             if iscell(obj.MiDCsvFile)
                Nfiles=size(obj.MiDCsvFile,2);
+               Rows=zeros(Nfiles,1);
+               Cols=Rows;
                for i=1:Nfiles
                   disp(strjoin({'Reading file',obj.MiDCsvFile{i},'...'}))
-                  DicMultOutput(:,:,i)=obj.ReadDataFunction(obj.MiDCsvFile{i});
+                  DicLocOut=obj.ReadDataFunction(obj.MiDCsvFile{i});
+                  [Rows(i),Cols(i)]=size(DicLocOut);
+                  %Message if things are missing
+                  if not(Rows(i)==Rows(1))
+                       msgID = 'ReadMultipleData:InconsistentRows';
+                       msg = strjoin({'The number of row data between DIC output files is different!',...
+                           'Expected',num2str(Rows(1)),'rows, but got',num2str(Rows(i))});
+                       warning(msgID,msg)
+                  end
+                  if not(Cols(i)==Cols(1))
+                       msgID = 'ReadMultipleData:InconsistentCols';
+                       msg = strjoin({'The number of column data between DIC output files is different!',...
+                           'Expected',num2str(Cols(1)),'columns, but got',num2str(Cols(i))});
+                       warning(msgID,msg)                      
+                  end
+                  CorrectOut=obj.CorrectMatrixSize(DicLocOut,Rows(1),Cols(1));
+                  DicMultOutput(:,:,i)=CorrectOut;
                end
                
             else %throw exception if you have only one file
@@ -103,21 +121,23 @@ classdef MatchIDdataReader < handle
             fID=fopen(CustomFileName,'r') ;
             %initialize data
             buf=[];
+            Nn=[];
             indx=1;
                %Read csv file and dump to buffer
                 while not(feof(fID))
                     tline = fgetl(fID); %get line
                     LineCell=strsplit(tline,';'); %separate with semicol
-                    Nn=size(LineCell,2)-1; %remember that last char is \n
-                    pp=zeros(1,Nn); %initialize row scan
-                    for kk=1:Nn
+                    Nn(indx)=size(LineCell,2)-1; %remember that last char is \n
+                    pp=zeros(1,Nn(indx)); %initialize row scan
+                    for kk=1:Nn(indx)
                         if strcmp(LineCell{kk},obj.NaNStrDesc) %parse NaN correctly
                             pp(kk)=NaN;
                         else
                             pp(kk)=obj.ReadNumberStringAsSystem(LineCell{kk}); %parse double correctly according to system separator
                         end
                     end
-                    buf(indx,:)=pp'; %dump inside buffer
+                    LineToStore=obj.CorrectArraySize(pp',Nn(1));
+                    buf(indx,:)=LineToStore; %dump inside buffer
                     indx=indx+1;
                 end
             fclose(fID);
@@ -133,6 +153,42 @@ classdef MatchIDdataReader < handle
             clear('nf')
         end
         %=================================================================
+        function NewArray=CorrectArraySize(ParData,NLength)
+            L=length(ParData);
+            if isempty(ParData) % Throw exception cause data is empty
+               NewArray=NaN(NLength,1);
+               msgID = 'CorrectArraySize:EmptyData';
+               msg = 'The data vector is empty.. replacing with NaNs';
+               warning(msgID,msg)
+            else
+                if L<NLength
+                    NewArray=padarray(ParData,[NLength-L 0],NaN,'post');
+                    disp('pippo')
+                elseif L==NLength
+                    NewArray=ParData;
+                elseif L>NLength
+                    NewArray=ParData(1:NLength);
+                end
+            end
+        end
+        %=================================================================
+        function NewMat=CorrectMatrixSize(MatDat,Rows,Cols)
+            [m,n]=size(MatDat);
+            if m>Rows
+               IntMat=MatDat(1:Rows,:); 
+            elseif m==Rows
+               IntMat=MatDat;
+            elseif m<Rows
+               IntMat=padarray(MatDat,[Rows-m 0],NaN,'post');
+            end
+            if n>Cols
+               NewMat=IntMat(:,1:Cols); 
+            elseif n==Cols
+               NewMat=IntMat;
+            elseif n<Cols
+               NewMat=padarray(IntMat,[0 Cols-n],NaN,'post');
+            end
+        end
     end
     
 end
