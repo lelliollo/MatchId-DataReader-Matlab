@@ -61,29 +61,7 @@ classdef MatchIDdataReader < handle
                throw(SingleFileException);
                DicMultOutput=zeros(2,2,2);
             else
-                    %open csv file in read mode
-                    fID=fopen(obj.MiDCsvFile,'r') ;
-                    %initialize data
-                    buf=[];
-                    indx=1;
-                       %Read csv file and dump to buffer
-                        while not(feof(fID))
-                            tline = fgetl(fID); %get line
-                            LineCell=strsplit(tline,';'); %separate with semicol
-                            Nn=size(LineCell,2)-1; %remember that last char is \n
-                            pp=zeros(1,Nn); %initialize row scan
-                            for kk=1:Nn
-                                if strcmp(LineCell{kk},obj.NaNStrDesc) %parse NaN correctly
-                                    pp(kk)=NaN;
-                                else
-                                    pp(kk)=obj.ReadNumberStringAsSystem(LineCell{kk}); %parse double correctly according to system separator
-                                end
-                            end
-                            buf(indx,:)=pp'; %dump inside buffer
-                            indx=indx+1;
-                        end
-                    fclose(fID);
-                    DicOutput=buf; %dummy move, but nice to see
+               DicOutput=obj.ReadDataFunction(obj.MiDCsvFile);
             end
          end
          %=================================================================
