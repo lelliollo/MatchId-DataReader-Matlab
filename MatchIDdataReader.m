@@ -8,7 +8,7 @@ classdef MatchIDdataReader < handle
     %Initialize class in this way:
     %        MiDReaderHandle=MatchIDdataReader('filename.csv')
     %the file name can be given as full path or local name. It can be a
-    %single string or a cell array {1XN} of strings. 
+    %single string or a cell array {1XJ} of strings. 
     %
     %Method(s):
     %   ReadData() ---> it reads the csv file and returns: 
@@ -30,19 +30,19 @@ classdef MatchIDdataReader < handle
     %
     % For further information type "help" on the function context
     % ==========================================================================
-    % LICENSE and WARRANTY
-    %    This program is free software: you can redistribute it and/or modify
-    % it under the terms of the GNU General Public License as published by
-    % the Free Software Foundation, either version 3 of the License, or
-    % (at your option) any later version.
-    %
-    % This program is distributed in the hope that it will be useful,
-    % but WITHOUT ANY WARRANTY; without even the implied warranty of
-    % MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    % GNU General Public License for more details.
-    %
-    % You should have received a copy of the GNU General Public License
-    % along with this program.  If not, see <https://www.gnu.org/licenses/>.
+    %     LICENSE and WARRANTY
+    %        This program is free software: you can redistribute it and/or modify
+    %     it under the terms of the GNU General Public License as published by
+    %     the Free Software Foundation, either version 3 of the License, or
+    %     (at your option) any later version.
+    %     
+    %     This program is distributed in the hope that it will be useful,
+    %     but WITHOUT ANY WARRANTY; without even the implied warranty of
+    %     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    %     GNU General Public License for more details.
+    %     
+    %     You should have received a copy of the GNU General Public License
+    %     along with this program.  If not, see <https://www.gnu.org/licenses/>.
     
     properties
         MiDCsvFile %property to store filename data
