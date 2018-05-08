@@ -11,14 +11,24 @@ classdef MatchIDdataReader < handle
     %single string or a cell array {1XN} of strings. 
     %
     %Method(s):
-    %   ReadData() ---> it reads the csv file and returns a matrix. The
-    %                   usage is quite simple: Mat= MiDReaderHandle.ReadData()
-    %   ReadMultipleData() ---> it reads a list of csv file and returns a (MxNxJ)matrix. The
-    %                   usage is quite simple: Mat= MiDReaderHandle.ReadMultipleData()
+    %   ReadData() ---> it reads the csv file and returns: 
+    %                       -a matrix containing DIC data
+    %                       -a matrix containing missing data labels
+    %                   The usage is quite simple: 
+    %                       [Mat, missing_data] = HandleToClass.ReadData()
+    %                   
+    %   ReadMultipleData() ---> it reads a list of csv file and returns: 
+    %                       -a (MxNxJ) matrix containing DIC data
+    %                       -a (MxNxJ) matrix containing missing data labels
+    %                   The usage is quite simple: 
+    %                       [Mat, missing_data] = HandleToClass.ReadMultipleData()
+    %
     %   SetFileName(path) ---> methods to change file(s) name you are
     %                          working on
+    %
     %   SetNaNString(string)--> you can put a custom NaN string          
     %
+    % For further information type "help" on the function context
     % ==========================================================================
     % LICENSE and WARRANTY
     %    This program is free software: you can redistribute it and/or modify
@@ -53,26 +63,46 @@ classdef MatchIDdataReader < handle
          end
          %% Data read functions
          %=================================================================
-         function DicOutput=ReadData(obj) %throw exception if you have multiple files
-            if iscell(obj.MiDCsvFile)
+         function [DicOutput,missing_data]=ReadData(obj) 
+            %This method reads a single .CSV matrix file and returns the
+            %following variables:
+            % ------> DicOutput: a matrix containing DIC data
+            % ------> missing_data: a logical matrix containing ones where data is missing
+            %Missing data are handled in a simple way: they are filled with
+            %NaN. Given that MatchID doesn't provide any details on what is
+            %missing where, data are read in a FIFO fashion and filled in
+            %the end of each row
+             if iscell(obj.MiDCsvFile)%throw exception if you have multiple files
                msgID = 'ReadData:MultipleFiles';
                msg = 'You cannot use read on multiple files. Try ReadMultipleData()';
                SingleFileException = MException(msgID,msg);
                throw(SingleFileException);
                DicMultOutput=zeros(2,2,2);
-            else
-               DicOutput=obj.ReadDataFunction(obj.MiDCsvFile);
+             else
+                disp(strjoin({'Reading single file',obj.MiDCsvFile,'...'}))
+               [DicOutput,missing_data]=obj.ReadDataFunction(obj.MiDCsvFile);
             end
          end
          %=================================================================
-         function  DicMultOutput=ReadMultipleData(obj)
+         function  [DicMultOutput,missing_data]=ReadMultipleData(obj)
+            %This method reads multiple .CSV matrix files and returns the
+            %following variables:
+            % ------> DicOutput: a matrix containing DIC data
+            % ------> missing_data: a logical matrix containing ones where data is missing
+            %Missing data are handled in a simple way: they are filled with
+            %NaN. Given that MatchID doesn't provide any details on what is
+            %missing where, data are read in a FIFO fashion and filled in
+            %the end of each row
             if iscell(obj.MiDCsvFile)
+               disp('Processing multiple CSV files')
+               DicMultOutput=[];
+               missing_data=[];
                Nfiles=size(obj.MiDCsvFile,2);
                Rows=zeros(Nfiles,1);
                Cols=Rows;
                for i=1:Nfiles
                   disp(strjoin({'Reading file',obj.MiDCsvFile{i},'...'}))
-                  DicLocOut=obj.ReadDataFunction(obj.MiDCsvFile{i});
+                  [DicLocOut,Miss]=obj.ReadDataFunction(obj.MiDCsvFile{i});
                   [Rows(i),Cols(i)]=size(DicLocOut);
                   %Message if things are missing
                   if not(Rows(i)==Rows(1))
@@ -87,8 +117,10 @@ classdef MatchIDdataReader < handle
                            'Expected',num2str(Cols(1)),'columns, but got',num2str(Cols(i))});
                        warning(msgID,msg)                      
                   end
-                  CorrectOut=obj.CorrectMatrixSize(DicLocOut,Rows(1),Cols(1));
+                  CorrectOut=obj.CorrectMatrixSize(DicLocOut,Rows(1),Cols(1),NaN);
+                  CorrectMiss=obj.CorrectMatrixSize(Miss,Rows(1),Cols(1),1);
                   DicMultOutput(:,:,i)=CorrectOut;
+                  missing_data(:,:,i)=CorrectMiss;
                end
                
             else %throw exception if you have only one file
@@ -103,12 +135,20 @@ classdef MatchIDdataReader < handle
          %% Set property functions
          %=================================================================
          function obj=SetFileName(obj,path)
-             %Method to manipulate the path of the csv to read
+             %This method allows the user to set the filenames of .CSV
+             %matrix files to be read. Usage:
+             %
+             %  handle.SetFileName(path)
+             %
+             %If path is given a single string, then the class consider
+             %this as a single file to be read. If path is given as a cell
+             %array {1XN} of strings, then the class reads multiple files
             obj.MiDCsvFile=path; 
          end
          %=================================================================
          function obj=SetNaNString(obj,CustomNanString)
-             %Method to manipulate the nan string
+             %With this method you can setup a custom NaN string for the
+             %CSV files to be intepreted.
             obj.NaNStrDesc=CustomNanString;
          end
          %=================================================================
@@ -116,11 +156,14 @@ classdef MatchIDdataReader < handle
     %% Private stuffs
     methods(Access=private)
         %=================================================================
-        function DicOutputSingle=ReadDataFunction(obj,CustomFileName)
-            %open csv file in read mode
-            fID=fopen(CustomFileName,'r') ;
+        function [DicOutputSingle,missing_data_matrix]=ReadDataFunction(obj,CustomFileName)
+            %This method implements the private delegate to perform file
+            %reading and translation to Matlab matrix         
+            
+            fID=fopen(CustomFileName,'r') ;%open csv file in read mode
             %initialize data
             buf=[];
+            missing_data_matrix=[];
             Nn=[];
             indx=1;
                %Read csv file and dump to buffer
@@ -136,8 +179,9 @@ classdef MatchIDdataReader < handle
                             pp(kk)=obj.ReadNumberStringAsSystem(LineCell{kk}); %parse double correctly according to system separator
                         end
                     end
-                    LineToStore=obj.CorrectArraySize(pp',Nn(1));
+                    [LineToStore,missDataIndx]=obj.CorrectArraySize(pp',Nn(1),NaN);
                     buf(indx,:)=LineToStore; %dump inside buffer
+                    missing_data_matrix(indx,:)=missDataIndx;
                     indx=indx+1;
                 end
             fclose(fID);
@@ -148,13 +192,16 @@ classdef MatchIDdataReader < handle
     methods (Static,Access=private)
         %=================================================================
         function SysDoub=ReadNumberStringAsSystem(NumStr)
+            %method to parse data from string
             nf = java.text.DecimalFormat;
             SysDoub=nf.parse(NumStr).doubleValue;
             clear('nf')
         end
         %=================================================================
-        function NewArray=CorrectArraySize(ParData,NLength)
+        function [NewArray,missingDataFlag]=CorrectArraySize(ParData,NLength,repl_val)
+            %Method to fill missing points in row scan of CSV files            
             L=length(ParData);
+            missingDataFlag=zeros(NLength,1);
             if isempty(ParData) % Throw exception cause data is empty
                NewArray=NaN(NLength,1);
                msgID = 'CorrectArraySize:EmptyData';
@@ -162,7 +209,9 @@ classdef MatchIDdataReader < handle
                warning(msgID,msg)
             else
                 if L<NLength
-                    NewArray=padarray(ParData,[NLength-L 0],NaN,'post');
+                    deltaLength=NLength-L;
+                    missingDataFlag(end-deltaLength:end)=ones(deltaLength,1);
+                    NewArray=padarray(ParData,[deltaLength 0],repl_val,'post');
                     disp('pippo')
                 elseif L==NLength
                     NewArray=ParData;
@@ -172,14 +221,15 @@ classdef MatchIDdataReader < handle
             end
         end
         %=================================================================
-        function NewMat=CorrectMatrixSize(MatDat,Rows,Cols)
+        function NewMat=CorrectMatrixSize(MatDat,Rows,Cols,repl_val)
+            %Method to fill missing points in matrix scan of multiple CSV files     
             [m,n]=size(MatDat);
             if m>Rows
                IntMat=MatDat(1:Rows,:); 
             elseif m==Rows
                IntMat=MatDat;
             elseif m<Rows
-               IntMat=padarray(MatDat,[Rows-m 0],NaN,'post');
+               IntMat=padarray(MatDat,[Rows-m 0],repl_val,'post');
             end
             if n>Cols
                NewMat=IntMat(:,1:Cols); 
