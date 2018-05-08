@@ -236,7 +236,7 @@ classdef MatchIDdataReader < handle
             elseif n==Cols
                NewMat=IntMat;
             elseif n<Cols
-               NewMat=padarray(IntMat,[0 Cols-n],NaN,'post');
+               NewMat=padarray(IntMat,[0 Cols-n],repl_val,'post');
             end
         end
     end
